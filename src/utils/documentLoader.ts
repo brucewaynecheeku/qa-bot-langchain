@@ -1,8 +1,7 @@
 import path from "node:path";
 import fs from "node:fs/promises";
-import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
-import { DocxLoader } from "@langchain/community/document_loaders/fs/docx";
-import { Document } from "@langchain/core/documents";
+import pdfParse from "pdf-parse/lib/pdf-parse.js";
+import mammoth from "mammoth";
 
 /**
  * Load a PDF or DOCX document and return its text content
@@ -12,25 +11,16 @@ export async function loadDocument(filePath: string): Promise<string> {
 
   try {
     if (ext === ".pdf") {
-      const loader = new PDFLoader(filePath, {
-        parsedItemSeparator: " ",
-        splitPages: false
-      });
-      const docs = await loader.load();
-      
-      return docs
-        .map((d: Document) => d.pageContent.trim())
-        .join("\n\n");
+      const data = await fs.readFile(filePath);
+      const parsed = await pdfParse(data);
+      // pdf-parse returns an object with a `text` property
+      return (parsed.text || "").trim();
     }
 
     if (ext === ".docx") {
-      const loader = new DocxLoader(filePath);
-      const docs = await loader.load();
-      
-      return docs
-        .map((d: Document) => d.pageContent.trim())
-        .filter((content: string) => content.length > 0)
-        .join("\n\n");
+      // mammoth.extractRawText returns an object with a `value` string
+      const result = await mammoth.extractRawText({ path: filePath });
+      return (result.value || "").trim();
     }
 
     throw new Error(`Unsupported file type: ${ext}. Only .pdf and .docx are supported.`);
